@@ -1,6 +1,55 @@
 // Runs every time a new tab opens.
-// Rolls the dice: with probability `settings.probability` (default 0.3),
-// play a random clip. Otherwise show a plain, quiet new tab.
+// Reads a small config.json (hosted on GitHub) that says how often to fire and
+// which clip(s) to play. You edit that file from your own laptop; this browser
+// follows on the next tab or two.
+//
+// Design: we roll instantly using the LAST config we cached locally (so new
+// tabs never stall on the network), and refresh the cache in the background for
+// next time. The very first run, with no cache yet, waits briefly for a fetch.
+
+const DEFAULT_CONFIG_URL =
+  "https://raw.githubusercontent.com/acchiya/Gaydansh/refs/heads/claude/chrome-random-clip-extension-0ssf2u/config.json";
+
+const HARD_DEFAULT = { probability: 0.3, volume: 1, clips: [] };
+
+function fromStorage(defaults) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(defaults, (items) => resolve(items));
+  });
+}
+function toStorage(obj) {
+  return new Promise((resolve) => chrome.storage.local.set(obj, resolve));
+}
+
+function normalize(cfg) {
+  const out = { ...HARD_DEFAULT };
+  if (cfg && typeof cfg === "object") {
+    if (typeof cfg.probability === "number")
+      out.probability = Math.min(1, Math.max(0, cfg.probability));
+    if (typeof cfg.volume === "number")
+      out.volume = Math.min(1, Math.max(0, cfg.volume));
+    if (Array.isArray(cfg.clips))
+      out.clips = cfg.clips.filter((u) => typeof u === "string" && u.trim());
+  }
+  return out;
+}
+
+async function fetchConfig(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(url + "?cb=" + Date.now(), {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const cfg = normalize(await res.json());
+    await toStorage({ lastConfig: cfg });
+    return cfg;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 (async function () {
   const calm = document.getElementById("calm");
@@ -10,8 +59,7 @@
   function startClock() {
     const el = document.getElementById("clock");
     const tick = () => {
-      const now = new Date();
-      el.textContent = now.toLocaleTimeString([], {
+      el.textContent = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       });
@@ -19,43 +67,48 @@
     tick();
     setInterval(tick, 1000);
   }
-
   function showCalm() {
     stage.hidden = true;
     calm.hidden = false;
     startClock();
   }
 
-  let settings, clips;
-  try {
-    [settings, clips] = await Promise.all([getSettings(), getAllClips()]);
-  } catch (e) {
-    console.error("Random Clip: failed to load data", e);
-    return showCalm();
+  const { configUrl, lastConfig } = await fromStorage({
+    configUrl: DEFAULT_CONFIG_URL,
+    lastConfig: null,
+  });
+
+  let config;
+  if (lastConfig) {
+    // Instant path: use cached config now, refresh in the background.
+    config = lastConfig;
+    fetchConfig(configUrl).catch(() => {});
+  } else {
+    // First run: no cache, so wait (briefly) for a real fetch.
+    try {
+      config = await fetchConfig(configUrl);
+    } catch (e) {
+      config = HARD_DEFAULT;
+    }
   }
 
-  const roll = Math.random();
-  const win = roll < settings.probability;
+  const win = Math.random() < config.probability;
+  if (!win || config.clips.length === 0) return showCalm();
 
-  if (!win || clips.length === 0) {
-    return showCalm();
-  }
-
-  // Pick a random clip and play it full-screen.
-  const clip = clips[Math.floor(Math.random() * clips.length)];
-  const isAudio = (clip.type || "").startsWith("audio/");
-  const url = URL.createObjectURL(clip.blob);
+  const src = config.clips[Math.floor(Math.random() * config.clips.length)];
+  const isAudio = /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(src);
 
   const media = document.createElement(isAudio ? "audio" : "video");
-  media.src = url;
+  media.src = src;
   media.autoplay = true;
   media.controls = false;
-  media.volume = typeof settings.volume === "number" ? settings.volume : 1;
+  media.volume = config.volume;
   if (isAudio) stage.classList.add("audio-only");
 
-  // Clean up and drop back to a normal tab when the clip finishes.
-  media.addEventListener("ended", () => {
-    URL.revokeObjectURL(url);
+  media.addEventListener("ended", showCalm);
+  media.addEventListener("error", () => {
+    // Bad URL / offline / 404 — just fall back to a normal tab.
+    console.error("Random Clip: could not load", src);
     showCalm();
   });
 
@@ -63,18 +116,10 @@
   calm.hidden = true;
   stage.hidden = false;
 
-  // Attempt autoplay WITH sound. Chrome may block this on a page the user
-  // hasn't engaged with — in which case we wait for the first interaction,
-  // which on a fresh new tab is usually a click or keypress moments later.
   function playOnGesture() {
     tapHint.hidden = false;
     const go = () => {
-      media
-        .play()
-        .then(() => {
-          tapHint.hidden = true;
-        })
-        .catch(() => {});
+      media.play().then(() => (tapHint.hidden = true)).catch(() => {});
       window.removeEventListener("pointerdown", go);
       window.removeEventListener("keydown", go);
     };
@@ -85,7 +130,6 @@
   try {
     await media.play();
   } catch (err) {
-    // Blocked autoplay: fall back to play-on-first-interaction.
     playOnGesture();
   }
 })();

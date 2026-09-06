@@ -1,99 +1,104 @@
-// Settings + clip management UI.
+// Settings UI for the remote-controlled version.
+// The only real setting stored on THIS machine is the config URL. Everything
+// else (probability, volume, clips) lives in the remote config.json.
 
-const probEl = document.getElementById("prob");
-const probOut = document.getElementById("probOut");
-const volEl = document.getElementById("vol");
-const volOut = document.getElementById("volOut");
-const fileEl = document.getElementById("file");
-const listEl = document.getElementById("list");
-const emptyEl = document.getElementById("empty");
+const DEFAULT_CONFIG_URL =
+  "https://raw.githubusercontent.com/acchiya/Gaydansh/refs/heads/claude/chrome-random-clip-extension-0ssf2u/config.json";
+
+const urlEl = document.getElementById("url");
+const saveEl = document.getElementById("save");
+const checkEl = document.getElementById("check");
+const liveEl = document.getElementById("live");
+const testEl = document.getElementById("test");
 const statusEl = document.getElementById("status");
+const preview = document.getElementById("preview");
 
 let statusTimer;
-function flash(msg) {
+function flash(msg, ok = true) {
   statusEl.textContent = msg;
+  statusEl.style.color = ok ? "#9ad29a" : "#ff9a9a";
   clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => (statusEl.textContent = ""), 2500);
-}
-
-function fmtSize(bytes) {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-async function renderList() {
-  const clips = await getAllClips();
-  listEl.innerHTML = "";
-  emptyEl.hidden = clips.length > 0;
-  for (const clip of clips) {
-    const li = document.createElement("li");
-
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.innerHTML =
-      `<div>${escapeHtml(clip.name)}</div>` +
-      `<div class="size">${escapeHtml(clip.type || "?")} · ${fmtSize(clip.size || 0)}</div>`;
-
-    const del = document.createElement("button");
-    del.className = "del";
-    del.textContent = "Remove";
-    del.addEventListener("click", async () => {
-      await deleteClip(clip.id);
-      flash("Removed.");
-      renderList();
-    });
-
-    li.append(meta, del);
-    listEl.appendChild(li);
-  }
+  statusTimer = setTimeout(() => (statusEl.textContent = ""), 3000);
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-  });
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
 }
 
-// --- Init ---
+function get(defaults) {
+  return new Promise((r) => chrome.storage.local.get(defaults, r));
+}
+function set(obj) {
+  return new Promise((r) => chrome.storage.local.set(obj, r));
+}
+
+let lastClips = [];
+
+async function check() {
+  const url = urlEl.value.trim();
+  if (!url) return flash("Enter a config URL first.", false);
+  liveEl.textContent = "Checking…";
+  testEl.hidden = true;
+  try {
+    const res = await fetch(url + "?cb=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const cfg = await res.json();
+    const prob = Math.round((Number(cfg.probability) || 0) * 100);
+    const vol = Math.round((Number(cfg.volume ?? 1)) * 100);
+    const clips = Array.isArray(cfg.clips) ? cfg.clips : [];
+    lastClips = clips;
+
+    liveEl.innerHTML =
+      `<div class="stat"><b>${prob}%</b> chance a clip plays</div>` +
+      `<div class="stat"><b>${vol}%</b> volume</div>` +
+      `<div class="stat"><b>${clips.length}</b> clip(s):</div>` +
+      (clips.length
+        ? `<ul class="cliplist">${clips
+            .map((c) => `<li>${escapeHtml(c)}</li>`)
+            .join("")}</ul>`
+        : `<p class="warn">No clips listed — nothing will ever play.</p>`);
+
+    testEl.hidden = clips.length === 0;
+    flash("Config loaded.");
+    // Cache it so new tabs use the fresh values immediately.
+    await set({
+      lastConfig: {
+        probability: Math.min(1, Math.max(0, Number(cfg.probability) || 0)),
+        volume: Math.min(1, Math.max(0, Number(cfg.volume ?? 1))),
+        clips: clips.filter((c) => typeof c === "string"),
+      },
+    });
+  } catch (e) {
+    liveEl.innerHTML = `<p class="warn">Couldn't load config: ${escapeHtml(
+      e.message
+    )}</p><p class="hint">Check the URL is the <b>raw</b> GitHub link and the file exists.</p>`;
+    flash("Fetch failed.", false);
+  }
+}
+
 (async function () {
-  const settings = await getSettings();
-  probEl.value = Math.round(settings.probability * 100);
-  probOut.textContent = probEl.value + "%";
-  volEl.value = Math.round((settings.volume ?? 1) * 100);
-  volOut.textContent = volEl.value + "%";
-  renderList();
+  const { configUrl } = await get({ configUrl: DEFAULT_CONFIG_URL });
+  urlEl.value = configUrl;
+  check();
 })();
 
-// --- Events ---
-probEl.addEventListener("input", () => {
-  probOut.textContent = probEl.value + "%";
-});
-probEl.addEventListener("change", async () => {
-  await saveSettings({ probability: Number(probEl.value) / 100 });
+saveEl.addEventListener("click", async () => {
+  const url = urlEl.value.trim();
+  if (!url) return flash("URL can't be empty.", false);
+  await set({ configUrl: url });
   flash("Saved.");
+  check();
 });
 
-volEl.addEventListener("input", () => {
-  volOut.textContent = volEl.value + "%";
-});
-volEl.addEventListener("change", async () => {
-  await saveSettings({ volume: Number(volEl.value) / 100 });
-  flash("Saved.");
-});
+checkEl.addEventListener("click", check);
 
-fileEl.addEventListener("change", async () => {
-  const files = Array.from(fileEl.files || []);
-  if (!files.length) return;
-  for (const f of files) {
-    try {
-      await addClip(f);
-    } catch (e) {
-      flash("Couldn't store " + f.name + " (too large?)");
-      console.error(e);
-    }
-  }
-  fileEl.value = "";
-  flash(files.length === 1 ? "Clip added." : files.length + " clips added.");
-  renderList();
+testEl.addEventListener("click", () => {
+  if (!lastClips.length) return;
+  const src = lastClips[0];
+  preview.hidden = false;
+  preview.src = src;
+  preview.controls = true;
+  preview.play().catch(() => flash("Autoplay blocked — press play on the video.", false));
 });

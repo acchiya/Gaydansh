@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Random Clip New Tab",
-  "version": "1.0.0",
-  "description": "30% of the time, opening a new tab plays one of your clips. The other 70% it's a normal, quiet new tab.",
+  "version": "2.0.0",
+  "description": "30% of new tabs play a clip you control remotely. Change the clip or the odds from your own laptop via GitHub; this browser follows.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
@@ -11,5 +11,6 @@
     "default_title": "Random Clip New Tab — settings",
     "default_popup": "options.html"
   },
-  "permissions": ["storage"]
+  "permissions": ["storage"],
+  "host_permissions": ["https://raw.githubusercontent.com/*"]
 }
