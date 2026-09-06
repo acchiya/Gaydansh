@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New Tab</title>
+    <link rel="stylesheet" href="newtab.css" />
+  </head>
+  <body>
+    <!-- The calm 70%: a plain, quiet new tab -->
+    <main id="calm" class="calm" hidden>
+      <div id="clock" class="clock"></div>
+    </main>
+
+    <!-- The loud 30%: a clip takes over the screen -->
+    <div id="stage" class="stage" hidden>
+      <div id="tapHint" class="tap-hint" hidden>Click anywhere</div>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="newtab.js"></script>
+  </body>
+</html>

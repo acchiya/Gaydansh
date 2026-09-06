@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Random Clip — settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Random Clip New Tab</h1>
+      <p class="sub">
+        A clip plays on some new tabs. Add clips and set how often it fires.
+      </p>
+
+      <section class="card">
+        <label class="field">
+          <span class="label">Chance a clip plays on a new tab</span>
+          <div class="row">
+            <input
+              type="range"
+              id="prob"
+              min="0"
+              max="100"
+              step="5"
+              value="30"
+            />
+            <output id="probOut">30%</output>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="label">Volume</span>
+          <div class="row">
+            <input
+              type="range"
+              id="vol"
+              min="0"
+              max="100"
+              step="5"
+              value="100"
+            />
+            <output id="volOut">100%</output>
+          </div>
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="row spread">
+          <h2>Clips</h2>
+          <label class="btn">
+            + Add clip(s)
+            <input type="file" id="file" accept="video/*,audio/*" multiple hidden />
+          </label>
+        </div>
+        <p class="hint">
+          Files are stored locally in this browser only. Nothing is uploaded.
+        </p>
+        <ul id="list" class="list"></ul>
+        <p id="empty" class="empty">No clips yet. Add one above.</p>
+      </section>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

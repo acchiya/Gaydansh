@@ -1,0 +1,90 @@
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0f0f10;
+  color: #e8e8ea;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* --- Calm state (70%) --- */
+.calm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.clock {
+  font-size: clamp(48px, 12vw, 160px);
+  font-weight: 200;
+  letter-spacing: 2px;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Loud state (30%) --- */
+.stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage video,
+.stage audio {
+  max-width: 100vw;
+  max-height: 100vh;
+  outline: none;
+}
+
+/* An audio-only clip has nothing to show, so give it presence */
+.stage.audio-only {
+  background: radial-gradient(circle at center, #241a3a, #000);
+}
+.stage.audio-only::before {
+  content: "♪";
+  position: absolute;
+  font-size: 30vh;
+  opacity: 0.12;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.2;
+  }
+}
+
+.tap-hint {
+  position: absolute;
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 20px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+  animation: blink 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
