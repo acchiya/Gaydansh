@@ -10,31 +10,60 @@
     <div class="wrap">
       <h1>Random Clip New Tab</h1>
       <p class="sub">
-        This browser reads its settings from a file you host on GitHub. Change
-        that file from your own laptop and this browser follows automatically.
+        A clip plays on some new tabs. Add clips and set how often it fires.
       </p>
 
       <section class="card">
         <label class="field">
-          <span class="label">Config file URL (the "raw" GitHub link)</span>
-          <input type="text" id="url" class="text" spellcheck="false" />
+          <span class="label">Chance a clip plays on a new tab</span>
+          <div class="row">
+            <input
+              type="range"
+              id="prob"
+              min="0"
+              max="100"
+              step="5"
+              value="30"
+            />
+            <output id="probOut">30%</output>
+          </div>
         </label>
-        <div class="row">
-          <button id="save" class="btn">Save</button>
-          <button id="check" class="btn ghost">Check now</button>
-        </div>
+
+        <label class="field">
+          <span class="label">Volume</span>
+          <div class="row">
+            <input
+              type="range"
+              id="vol"
+              min="0"
+              max="100"
+              step="5"
+              value="100"
+            />
+            <output id="volOut">100%</output>
+          </div>
+        </label>
       </section>
 
       <section class="card">
-        <h2>What's live right now</h2>
-        <div id="live" class="live">Not checked yet.</div>
-        <button id="test" class="btn ghost" hidden>Test-play first clip</button>
+        <div class="row spread">
+          <h2>Clips</h2>
+          <label class="btn">
+            + Add clip(s)
+            <input type="file" id="file" accept="video/*,audio/*" multiple hidden />
+          </label>
+        </div>
+        <p class="hint">
+          Files are stored locally in this browser only. Nothing is uploaded.
+        </p>
+        <ul id="list" class="list"></ul>
+        <p id="empty" class="empty">No clips yet. Add one above.</p>
       </section>
 
       <p id="status" class="status" aria-live="polite"></p>
     </div>
 
-    <video id="preview" hidden></video>
+    <script src="db.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
