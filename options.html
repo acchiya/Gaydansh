@@ -30,19 +30,23 @@
         </label>
 
         <label class="field">
-          <span class="label">Volume</span>
+          <span class="label">Loudness (over 100% amplifies &amp; distorts)</span>
           <div class="row">
             <input
               type="range"
               id="vol"
               min="0"
-              max="100"
-              step="5"
+              max="400"
+              step="10"
               value="100"
             />
             <output id="volOut">100%</output>
           </div>
         </label>
+        <p class="hint">
+          Can't go louder than the computer's own system volume — that's an
+          operating-system limit no browser can override.
+        </p>
       </section>
 
       <section class="card">

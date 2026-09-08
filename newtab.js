@@ -46,16 +46,41 @@
   const isAudio = (clip.type || "").startsWith("audio/");
   const url = URL.createObjectURL(clip.blob);
 
+  // Loudness: 0–1 is normal (attenuation), above 1 amplifies past the clip's
+  // own level using Web Audio (louder + distorted). NOTE: nothing here can
+  // exceed the operating system's master volume — that's a hardware/OS limit.
+  const loud = typeof settings.volume === "number" ? settings.volume : 1;
+
   const media = document.createElement(isAudio ? "audio" : "video");
   media.src = url;
   media.autoplay = true;
   media.controls = false;
-  media.volume = typeof settings.volume === "number" ? settings.volume : 1;
+  media.muted = false;
+  media.volume = Math.min(1, loud); // the element itself caps at 1.0
   if (isAudio) stage.classList.add("audio-only");
+
+  // Amplify beyond 100% when asked.
+  let audioCtx = null;
+  if (loud > 1) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+      const source = audioCtx.createMediaElementSource(media);
+      const gain = audioCtx.createGain();
+      gain.gain.value = loud; // e.g. 4 = 400%
+      source.connect(gain).connect(audioCtx.destination);
+    } catch (e) {
+      console.error("Random Clip: boost unavailable", e);
+    }
+  }
+  function resumeCtx() {
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  }
 
   // Clean up and drop back to a normal tab when the clip finishes.
   media.addEventListener("ended", () => {
     URL.revokeObjectURL(url);
+    if (audioCtx) audioCtx.close().catch(() => {});
     showCalm();
   });
 
@@ -69,6 +94,7 @@
   function playOnGesture() {
     tapHint.hidden = false;
     const go = () => {
+      resumeCtx();
       media
         .play()
         .then(() => {
@@ -84,6 +110,7 @@
 
   try {
     await media.play();
+    resumeCtx(); // the boost graph can start suspended even when playback isn't blocked
   } catch (err) {
     // Blocked autoplay: fall back to play-on-first-interaction.
     playOnGesture();
